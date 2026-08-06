@@ -1,42 +1,32 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import json
+from .waves import Wave
 
-class Signal:
-    def __init__(self, sample_rate, components):
+class SignalGenerator:
+    def __init__(self, sample_rate: int = 48000, duration: float = 1.0):
         self.sample_rate = sample_rate
+        self.duration = duration
+        self._waves: list[Wave] = []
+        number_of_samples = int(sample_rate * duration)
+        self.time = (np.arange(number_of_samples, dtype=np.float64)/ sample_rate)
 
-        self.components = components
-        self.freqs = [c['frequency'] for c in self.components]
-        self.amps = [c['amplitude'] for c in self.components]
-        self.starts = [c['start'] for c in self.components]
-        self.stops = [c['stop'] for c in self.components]
+    def add_wave(self, wave:Wave):
+        self._waves.append(wave)
 
-        self.duration = max(self.stops)
-        self.N = int(self.sample_rate * self.duration)
+    def remove_wave(self, index:int):
+        if index < 0 or index >= len(self._waves):
+            raise IndexError('Wave index is out of range')
+        return self._waves.pop(index)
 
-        self.generate()
-
-    @classmethod
-    def from_json(cls, filename):
-        with open(filename) as f:
-            data = json.load(f)
-
-        return cls(
-            data["sample_rate"],
-            data["components"],
-        )
+    def clear(self):
+        self._waves.clear()
 
     def generate(self):
-        self.tval = np.linspace(0, self.duration, self.N)
-        self.yval = np.zeros(len(self.tval))
-        for i in range(len(self.freqs)):
-            start = int(self.starts[i]*self.sample_rate)
-            stop = int(self.stops[i]*self.sample_rate)
-            self.yval[start:stop] += self.amps[i]*np.sin(self.freqs[i]*self.tval*(2*np.pi))[start:stop]
+        time = self.time
+        signal = np.zeros_like(time)
 
-    def noiser(self,mu,sig):
-        noise = np.random.normal(mu, sig, self.yval.shape)
-        self.yval += noise
+        for wave in self._waves:
+            signal += wave.generate(time)
 
+        return time, signal
     
