@@ -3,7 +3,7 @@ name = "fft-visualizer"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "Your Name",email = "you@example.com"}
+    {name = "Iori Adachi",email = "lightspeed.iori@gmail.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.14"
@@ -14,7 +14,9 @@ dependencies = [
     "plotly (>=6.9.0,<7.0.0)",
     "pandas (>=3.0.3,<4.0.0)",
     "dash (>=4.4.0,<5.0.0)",
-    "tqdm (>=4.69.0,<5.0.0)"
+    "tqdm (>=4.69.0,<5.0.0)",
+    "pyqtgraph (>=0.14.0,<0.15.0)",
+    "pyqt6 (>=6.11.0,<7.0.0)"
 ]
 
 [tool.poetry]
