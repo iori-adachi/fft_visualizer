@@ -4,6 +4,9 @@ An interactive Python application for visualizing and experimenting with digital
 
 The project provides a graphical interface for generating signals, computing FFTs and spectrograms, applying frequency-domain processing, reconstructing signals, and working with audio files. I built it as a hands-on way to explore DSP concepts beyond textbook examples.
 
+<img width="2084" height="1265" alt="image" src="https://github.com/user-attachments/assets/d23d85db-f50c-49d5-ae2a-97a909c4679a" />
+
+
 ## Features
 
 - Generate sine, square, and sawtooth signals
