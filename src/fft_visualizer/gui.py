@@ -15,12 +15,14 @@ from PyQt6.QtWidgets import (
 
 from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt
+import time
 import pyqtgraph as pg
 from scipy.io import wavfile
 import numpy as np
 from .signal_generator import SignalGenerator
 from .waves import *
 from .visualize_fft import VisualizeFFT
+from scipy.signal import resample
 
 SAMPLE_RATE = 48000
 
@@ -32,7 +34,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("FFT Visualizer")
         self.resize(1200, 700)
 
-        self.generator = SignalGenerator(sample_rate=SAMPLE_RATE, duration=1.0)
+        self.generator = SignalGenerator(sample_rate=SAMPLE_RATE, duration=60.0)
         self.visualizer = VisualizeFFT(sample_rate=SAMPLE_RATE)
 
 
@@ -60,7 +62,6 @@ class MainWindow(QMainWindow):
 
         # Amplitude control
         self.amplitude_label = QLabel("Amplitude: 1.00")
-
         self.amplitude_slider = QSlider(Qt.Orientation.Horizontal)
         self.amplitude_slider.setRange(0, 200)
         self.amplitude_slider.setValue(100)
@@ -70,7 +71,6 @@ class MainWindow(QMainWindow):
 
         # Phase control
         self.phase_label = QLabel("Phase: 0")
-
         self.phase_slider = QSlider(Qt.Orientation.Horizontal)
         self.phase_slider.setRange(-180, 180)
         self.phase_slider.setValue(0)
@@ -93,6 +93,11 @@ class MainWindow(QMainWindow):
 
         control_layout.addWidget(self.remove_wave_button)
         control_layout.addWidget(self.clear_waves_button)
+
+        # Toggle Spectrogram
+        self.spectrogram_toggle = QPushButton("Show Spectrogram")
+        self.spectrogram_toggle.setCheckable(True)
+        control_layout.addWidget(self.spectrogram_toggle)
 
         # Keep controls aligned near the top
         control_layout.addStretch()
@@ -117,6 +122,10 @@ class MainWindow(QMainWindow):
         self.spectrum_plot.setMouseEnabled(x=True, y=False)
         plot_layout.addWidget(self.spectrum_plot)
         self.spectrum_curve = self.spectrum_plot.plot()
+        self.spectrogram_image = pg.ImageItem()
+        self.spectrum_plot.addItem(self.spectrogram_image)
+        self.spectrogram_image.setVisible(False)
+        self.spectrogram_image.setColorMap(pg.colormap.get('viridis'))
 
 
         # -----------------------
@@ -146,6 +155,7 @@ class MainWindow(QMainWindow):
         self.add_wave_button.clicked.connect(self.add_wave)
         self.remove_wave_button.clicked.connect(self.remove_selected_wave)
         self.clear_waves_button.clicked.connect(self.clear_waves)
+        self.spectrogram_toggle.toggled.connect(self.on_spectrogram_toggled)
 
         self.make_menu()
         self.refresh_plot()
@@ -201,10 +211,43 @@ class MainWindow(QMainWindow):
         time, signal = self.generator.generate()
         self.signal_curve.setData(time, signal)
 
+        if self.spectrogram_toggle.isChecked():
+            self.update_spectrogram(signal)
+        else:
+            self.visualizer.set_signal(signal)
+            self.visualizer.calculate_fft()
+            freqs, mags = self.visualizer.get_spectrum()
+            self.spectrum_curve.setData(freqs,mags)
+
+
+    def on_spectrogram_toggled(self, checked):
+        self.spectrogram_toggle.setText("Show Spectrum" if checked else "Show Spectrogram")
+        self.spectrum_curve.setVisible(not checked)
+        self.spectrogram_image.setVisible(checked)
+
+        if checked:
+            self.spectrum_plot.setLabels(left='Frequency [Hz]', bottom='Time [s]')
+        else:
+            self.spectrum_plot.setLabels(left='Amplitude', bottom='Frequency [Hz]')
+
+        self.refresh_plot()
+        self.spectrum_plot.autoRange()
+
+
+    def update_spectrogram(self, signal):
         self.visualizer.set_signal(signal)
-        self.visualizer.calculate_fft()
-        freqs, mags = self.visualizer.get_sepctrum()
-        self.spectrum_curve.setData(freqs,mags)
+        self.visualizer.calculate_stft()
+
+        self.spectrogram_image.setImage(self.visualizer.fft_log, autoLevels=True)
+        self.spectrogram_image.setRect(
+            pg.QtCore.QRectF(
+                self.visualizer.times[0],
+                self.visualizer.freqs[0],
+                self.visualizer.times[-1] - self.visualizer.times[0],
+                self.visualizer.freqs[-1] - self.visualizer.freqs[0],
+            )
+        )
+        self.spectrum_plot.autoRange()  
 
 
     def make_menu(self):
@@ -222,22 +265,22 @@ class MainWindow(QMainWindow):
     def open_file(self):
 
         filename, _ = QFileDialog.getOpenFileName(
-            self,
-            "Open WAV File",
-            "",
-            "Wave Files (*.wav)"
+            self, "Open WAV File", "", "Wave Files (*.wav)"
         )
-
         if not filename:
             return
 
         sample_rate, signal = load_wav(filename)
 
-        t = np.arange(len(signal)) / sample_rate
+        # Resample to match the app's sample rate if needed
+        if sample_rate != SAMPLE_RATE:
+            num_samples = int(len(signal) * SAMPLE_RATE / sample_rate)
+            signal = resample(signal, num_samples)
 
-        self.signal_plot.clear()
-
-        self.signal_plot.plot(t, signal)
+        wave = SampledWave(samples=signal)
+        self.generator.add_wave(wave)
+        self.wave_list.addItem(wave.description())
+        self.refresh_plot()
 
 def load_wav(filename):
     sample_rate, data = wavfile.read(filename)

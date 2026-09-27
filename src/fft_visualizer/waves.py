@@ -77,3 +77,21 @@ class WhiteNoise(Wave):
             return (
                 f"Noise | A={self.amplitude:g}"
             )
+
+
+@dataclass(frozen=True)
+class SampledWave(Wave):
+    samples: np.ndarray  # already resampled to the generator's sample rate
+    amplitude: float = 1.0
+
+    def generate(self, time):
+        n = len(time)
+        data = self.samples
+        if len(data) < n:
+            data = np.pad(data, (0, n - len(data)))
+        elif len(data) > n:
+            data = data[:n]
+        return self.amplitude * data
+
+    def description(self):
+        return f"Sample | {len(self.samples)} samples | A={self.amplitude:g}"
